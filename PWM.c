@@ -3,19 +3,19 @@
 #include "hardware/pwm.h"
 #include "hardware/timer.h"
 
-#define LED_PWM 12
-#define Servo_PWM 22
+#define LED_PWM 12// pino do led azul
+#define Servo_PWM 22 //pino do servo motor
 
 //Coloca o PWM para 50Hz aproximadamente
 const uint16_t WRAP = 39000; // valor maximo do pwm
 const float DIVISER = 64; //divisor do clock para PWM
 
-const uint16_t servo0 = 975;
-const uint16_t servo90 = 2866;
-const uint16_t servo180 = 4680;
-const uint16_t add50 = 50;
+const uint16_t servo0 = 975;//servo em 0 graus
+const uint16_t servo90 = 2866;//servo em 90 graus
+const uint16_t servo180 = 4680;//servo em 180 graus
+const uint16_t add50 = 50;//variavel para incremento e decremento do duty em 50
 uint tempo = 10; // Tempo de transição em milissegundos
-uint16_t duty = servo180; // duty cicle definido em 0.12% do wrap
+uint16_t duty = servo180; // duty cicle definido em 12% do wrap, logo 180 graus
 const uint16_t limit = 47;//duty limite
 
 volatile bool cond = false;
@@ -40,25 +40,24 @@ void pwm_led(){
 
 }
 
-// Callback para desligar o terceiro LED e liberar a ativação do botão
+// Callback onde valida a variavel cond de falso para true
 uint64_t turn_off_Callback3(alarm_id_t id, void *user_data) {
     cond = true;
-
     return 0;
 }
 
-// Callback para desligar o segundo LED e iniciar o temporizador para o próximo
+// Callback onde muda de 90 para 0 graus
 uint64_t turn_off_Callback2(alarm_id_t id, void *user_data) {
-    duty = servo0;//0.025% do wrap
+    duty = servo0;//2,5% do wrap
     pwm_set_gpio_level(LED_PWM, duty); //definir o ciclo de trabalho (duty cycle) do pwm
     pwm_set_gpio_level(Servo_PWM, duty); //definir o ciclo de trabalho (duty cycle) do pwm
     add_alarm_in_ms(5000, turn_off_Callback3, NULL, false); // Chama o próximo callback após 5 segundos
     return 0;
 }
 
-// Callback para desligar o primeiro LED e iniciar o temporizador para o próximo
+// Callback onde muda de 180 para 90 graus
 uint64_t turn_off_Callback1(alarm_id_t id, void *user_data) {
-    duty = servo90;//0.0735% do wrap
+    duty = servo90;//7,35% do wrap
     pwm_set_gpio_level(LED_PWM, duty); //definir o ciclo de trabalho (duty cycle) do pwm
     pwm_set_gpio_level(Servo_PWM, duty); //definir o ciclo de trabalho (duty cycle) do pwm
     add_alarm_in_ms(5000, turn_off_Callback2, NULL, false); // Chama o próximo callback após 5 segundos
@@ -66,15 +65,18 @@ uint64_t turn_off_Callback1(alarm_id_t id, void *user_data) {
 }
 // Callback para a repetição do temporizador
 bool repeating_timer_callback(struct repeating_timer *t) {
+    //condição onde verifica se o servo motor está indo de 0 para 180 ou de 180 para 0
     if(Des_Sob == false){
-        duty+=add50;
+        duty+=add50;//incrementa 50
+        //condição que verifica se o servo está em 180 graus
         if(duty >= servo180){
-            Des_Sob = true;
+            Des_Sob = true; //altera varial
         }
     }else{
-        duty-=add50;
+        duty-=add50; // decrementa 50
+        //condição onde verifica se o servo motor está em 0 graus
         if(duty <=  servo0){
-            Des_Sob = false;
+            Des_Sob = false; //altera variavel
         }
     }
     
@@ -88,8 +90,8 @@ int main()
 {
     stdio_init_all();
 
-    pwm_servo();
-    pwm_led();
+    pwm_servo();//configuração do pwm do servo motor
+    pwm_led();//configuração do pwm do LED azul
 
     // Configura o temporizador repetitivo
     struct repeating_timer timer;
@@ -100,9 +102,10 @@ int main()
     // Tempo da próxima atualização
     absolute_time_t next_wake_time;
 
+    //chamando o primeiro callback
     add_alarm_in_ms(5000, turn_off_Callback1, NULL, false);
 
-
+    //laço principal
     while (true) {
         if(cond == true){
             add_repeating_timer_ms(tempo, repeating_timer_callback, NULL, &timer);
